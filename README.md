@@ -18,3 +18,6 @@ Then you can do
 $ zoketed -v
 zoketed v0.1 - Simple SOCKS5 Server (https://github.com/matricali/zokete)
 ```
+
+## License
+`zokete` is released under **GNU GPLv3**. You can view [LICENSE.txt](LICENSE.txt) file for more details.
