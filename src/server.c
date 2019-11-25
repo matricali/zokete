@@ -33,19 +33,13 @@ void zk_server_process_request(int socket_fd)
     long ret;
 
     static char buffer[BUFSIZE + 1];
-    // struct http_request request = {};
 
     ret = read(socket_fd, buffer, BUFSIZE);
-
-    printf("Recibiendo %d bytes...\n", ret);
-
-    for (int i = 0; i < ret; ++i) {
-        printf("[%d]=%02x\n", i, buffer[i]);
-    }
 
     if (ret == 0 || ret == -1) {
         (void)close(socket_fd);
         zk_logger(ZK_LOG_ERROR, "Failed to read from client.\n");
+        goto close_routine;
     }
 
     if (ret > 0 && ret < BUFSIZE) {
@@ -55,12 +49,61 @@ void zk_server_process_request(int socket_fd)
         buffer[0] = 0;
     }
 
+    // Debug momentaneo
+    printf("Recibiendo %ld bytes...\n", ret);
+    for (int i = 0; i < ret; ++i) {
+        printf("[%d]=%02x\n", i, buffer[i]);
+    }
+
+    // cursor position
+    int i = 0;
+
+    // version identifier
+    if (buffer[i] != 0x05) {
+        zk_logger(ZK_LOG_INFO, "Unsuported version (%02x)\n", buffer[i]);
+        goto close_routine;
+    }
+
+    // authentication method selection
+    int nmethods = (int)buffer[++i];
+
+    printf("i=%d", i);
+    ++i;
+
+    printf("Cantidad de metodos de autenticacion: %d\n", nmethods);
+
+    for (int x = 0; x < nmethods; ++x) {
+        switch (buffer[i + x]) {
+        case 0x00:
+            printf("NO AUTHENTICATION REQUIRED\n");
+            break;
+        case 0x01:
+            printf("GSSAPI\n");
+            break;
+        case 0x02:
+            printf("USERNAME/PASSWORD\n");
+            break;
+        case 0x03 ... 0x7F:
+            printf("IANA RESERVED\n");
+            break;
+        case 0x80 ... 0xFE:
+            printf("PRIVATE METHOD\n");
+            break;
+        case 0xFF:
+            printf("NO ACCEPTABLE METHOD\n");
+            break;
+        default:
+            printf("!!!!!!! METODO INVALIDO !!!!!!!! (%02x)\n", buffer[i + x]);
+        }
+    }
+
     sprintf(buffer, "HTTP/1.1 200 OK\nServer: zokete\nContent-Length: 0\nConnection: close\n\n");
     (void)write(socket_fd, buffer, strlen(buffer));
 
+close_routine:
     sleep(1);
     close(socket_fd);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 int zk_server_start(const unsigned int port)
