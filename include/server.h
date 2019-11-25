@@ -15,25 +15,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+#ifndef ZK_SERVER_H
+#define ZK_SERVER_H
 
-#include "logger.h"
-#include "server.h"
+void zk_server_start();
 
-void zk_print_banner()
-{
-    printf("zoketed v0.1 - Simple SOCKS5 Serverf (https://github.com/matricali/zokete)\n");
-}
-
-void zk_usage(const char* p)
-{
-    printf("usage: %s \n", p);
-}
-
-int main(int argc, char** argv)
-{
-    zk_logger(ZK_LOG_INFO, "Starting coso\n");
-    zk_server_start(1080);
-    exit(EXIT_SUCCESS);
-}
+#endif /* ZK_SERVER_H */

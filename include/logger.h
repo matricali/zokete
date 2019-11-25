@@ -15,25 +15,20 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+#ifndef ZK_LOGGER_H
+#define ZK_LOGGER_H
 
-#include "logger.h"
-#include "server.h"
+enum zk_log_level {
+    ZK_LOG_NONE,
+    ZK_LOG_FATAL,
+    ZK_LOG_ERROR,
+    ZK_LOG_WARNING,
+    ZK_LOG_NOTICE,
+    ZK_LOG_INFO,
+    ZK_LOG_DEBUG,
+    ZK_LOG_NEVER
+};
 
-void zk_print_banner()
-{
-    printf("zoketed v0.1 - Simple SOCKS5 Serverf (https://github.com/matricali/zokete)\n");
-}
+void zk_logger(enum zk_log_level level, const char* format, ...);
 
-void zk_usage(const char* p)
-{
-    printf("usage: %s \n", p);
-}
-
-int main(int argc, char** argv)
-{
-    zk_logger(ZK_LOG_INFO, "Starting coso\n");
-    zk_server_start(1080);
-    exit(EXIT_SUCCESS);
-}
+#endif /* ZK_LOGGER_H */

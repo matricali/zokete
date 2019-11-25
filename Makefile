@@ -4,7 +4,7 @@ CFLAGS	+= -Wall -g -std=gnu99 -O3 -Iinclude
 LDFLAGS	+= -lpthread -lssh
 
 NAME	= zoketed
-SRCS	:= zokete.c
+SRCS	:= zokete.c logger.c server.c
 OBJS	:= $(SRCS:%.c=obj/%.o)
 
 all: dirs $(NAME)
