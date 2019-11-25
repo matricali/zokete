@@ -1,6 +1,8 @@
 /*
  * This file is part of the zokete distribution
- * (https://github.com/matricali/zokete). Copyright (c) 2019 Jorge Matricali.
+ * (https://github.com/matricali/zokete).
+ *
+ * Copyright (c) 2019 Jorge Matricali.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
