@@ -37,7 +37,11 @@ void zk_server_process_request(int socket_fd)
 
     ret = read(socket_fd, buffer, BUFSIZE);
 
-    printf(">>%s\n", buffer);
+    printf("Recibiendo %d bytes...\n", ret);
+
+    for (int i = 0; i < ret; ++i) {
+        printf("[%d]=%02x\n", i, buffer[i]);
+    }
 
     if (ret == 0 || ret == -1) {
         (void)close(socket_fd);
