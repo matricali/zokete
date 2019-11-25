@@ -1,0 +1,3 @@
+zoketed
+*.o
+build/
