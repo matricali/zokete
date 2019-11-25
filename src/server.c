@@ -19,6 +19,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,43 +70,33 @@ void zk_server_process_request(int socket_fd)
     // authentication method selection
     int nmethods = (int)buffer[++i];
 
-    printf("i=%d", i);
-    ++i;
-
-    printf("Cantidad de metodos de autenticacion: %d\n", nmethods);
-
-    for (int x = 0; x < nmethods; ++x) {
-        switch (buffer[i + x]) {
-        case 0x00:
-            printf("NO AUTHENTICATION REQUIRED\n");
-            break;
-        case 0x01:
-            printf("GSSAPI\n");
-            break;
-        case 0x02:
-            printf("USERNAME/PASSWORD\n");
-            break;
-        case 0x03 ... 0x7F:
-            printf("IANA RESERVED\n");
-            break;
-        case 0x80 ... 0xFE:
-            printf("PRIVATE METHOD\n");
-            break;
-        case 0xFF:
-            printf("NO ACCEPTABLE METHOD\n");
-            break;
-        default:
-            printf("!!!!!!! METODO INVALIDO !!!!!!!! (%02x)\n", buffer[i + x]);
+    // looking for implemented authentication method
+    bool valid_method = false;
+    while (--nmethods > 0) {
+        if (buffer[++i] == 0x00) {
+            valid_method = true;
         }
     }
 
-    sprintf(buffer, "HTTP/1.1 200 OK\nServer: zokete\nContent-Length: 0\nConnection: close\n\n");
-    (void)write(socket_fd, buffer, strlen(buffer));
+    if (!valid_method) {
+        zk_logger(ZK_LOG_ERROR, "No valid authentication method.\n");
+        unsigned char msg[2] = { 0x05, 0xFF };
+        (void)write(socket_fd, msg, sizeof(msg));
+        goto close_routine;
+    }
+
+    // METHOD selection message
+    unsigned char msg[2] = { 0x05, 0x00 };
+    ret = write(socket_fd, msg, sizeof(msg));
+    printf("%ld bytes enviados:\n", ret);
+    for (int p = 0; p < ret; ++p) {
+        printf("[%d]=%02x\n", i, msg[p]);
+    }
 
 close_routine:
     sleep(1);
     close(socket_fd);
-    exit(EXIT_FAILURE);
+    exit(EXIT_SUCCESS);
 }
 
 int zk_server_start(const unsigned int port)
