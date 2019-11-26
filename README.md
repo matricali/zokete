@@ -15,8 +15,10 @@ make install
 ```
 Then you can do
 ```bash
-$ zoketed -v
-zoketed v0.1 - Simple SOCKS5 Server (https://github.com/matricali/zokete)
+$ zoketed -h
+zoketed v0.1 - A simple SOCKS5 Server (https://github.com/matricali/zokete)
+
+usage: zoketed [-hv] [--help] [--version] [-p port] [--port=port]
 ```
 
 ## License
