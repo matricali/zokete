@@ -77,20 +77,20 @@ void zk_server_process_request(int socket_fd)
     // looking for implemented authentication method
     bool valid_method = false;
     while (--nmethods >= 0) {
-        if (buffer[++i] == 0x00) {
+        if (buffer[++i] == ZK_SOCKS_METHOD_NO_AUTH) {
             valid_method = true;
         }
     }
 
     if (!valid_method) {
         zk_logger(ZK_LOG_ERROR, "No valid authentication method.\n");
-        char msg[2] = { 0x05, 0xFF };
+        char msg[2] = { 0x05, ZK_SOCKS_METHOD_NO_ACCEPTABLE_METHODS };
         zk_server_write(socket_fd, msg, sizeof(msg));
         goto close_routine;
     }
 
     // METHOD selection message
-    char msg[2] = { 0x05, 0x00 };
+    char msg[2] = { 0x05, ZK_SOCKS_METHOD_NO_AUTH };
     zk_server_write(socket_fd, msg, sizeof(msg));
 
     // 4. Request
@@ -103,7 +103,7 @@ void zk_server_process_request(int socket_fd)
     uint8_t atyp = buffer[i++];
 
     if (protocol != 0x05) {
-        zk_logger(ZK_LOG_INFO, "Unsuported protocol version (%02x)\n", buffer[i]);
+        zk_logger(ZK_LOG_INFO, "Unsuported protocol version (%02x)\n", protocol);
         goto close_routine;
     }
 
@@ -112,13 +112,13 @@ void zk_server_process_request(int socket_fd)
         goto close_routine;
     }
 
-    if (command != 0x01) { // CONNECT
+    if (command != ZK_SOCKS_CMD_CONNECT) {
         zk_logger(ZK_LOG_ERROR, "Command not supported. (%02x)\n", command);
         zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_COMMAND_NOT_SUPPORTED, atyp);
         goto close_routine;
     }
 
-    if (atyp != 0x01) { // IP_V4
+    if (atyp != ZK_SOCKS_ATYP_IP_V4) {
         zk_logger(ZK_LOG_ERROR, "Address type not supported. (%02x)\n", atyp);
         zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_ADDRESS_TYPE_NOT_SUPPORTED, atyp);
         goto close_routine;

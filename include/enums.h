@@ -25,6 +25,19 @@ typedef enum {
 } zk_socks_atyp_e;
 
 typedef enum {
+    ZK_SOCKS_CMD_CONNECT = 0x01,
+    ZK_SOCKS_CMD_BIND = 0x02,
+    ZK_SOCKS_CMD_UDP_ASSOCIATE = 0x03
+} zk_socks_cmd_e;
+
+typedef enum {
+    ZK_SOCKS_METHOD_NO_AUTH = 0x00,
+    ZK_SOCKS_METHOD_GSSAPI = 0x01,
+    ZK_SOCKS_METHOD_USERNAME_PASSWORD = 0x02,
+    ZK_SOCKS_METHOD_NO_ACCEPTABLE_METHODS = 0xFF
+} zk_socks_method_e;
+
+typedef enum {
     ZK_SOCKS_REP_SUCCEEDED = 0x00,
     ZK_SOCKS_REP_SERVER_FAILURE = 0x01,
     ZK_SOCKS_REP_NOT_ALLOWED_BY_RULESET = 0x02,
