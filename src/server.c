@@ -37,7 +37,7 @@ void zk_server_process_request(int socket_fd)
 {
     long ret;
 
-    static unsigned char buffer[BUFSIZE + 1];
+    static uint8_t buffer[BUFSIZE + 1];
 
     ret = zk_server_read(socket_fd, buffer, BUFSIZE);
 
@@ -76,87 +76,90 @@ void zk_server_process_request(int socket_fd)
 
     if (!valid_method) {
         zk_logger(ZK_LOG_ERROR, "No valid authentication method.\n");
-        unsigned char msg[2] = { 0x05, 0xFF };
+        uint8_t msg[2] = { 0x05, 0xFF };
         zk_server_write(socket_fd, msg, sizeof(msg));
         goto close_routine;
     }
 
     // METHOD selection message
-    unsigned char msg[2] = { 0x05, 0x00 };
+    uint8_t msg[2] = { 0x05, 0x00 };
     zk_server_write(socket_fd, msg, sizeof(msg));
 
     // 4. Request
     ret = zk_server_read(socket_fd, buffer, BUFSIZE);
     i = 0;
 
-    char protocol = buffer[i++];
-    char command = buffer[i++];
-    char rsv = buffer[i++];
-    char atyp = buffer[i++];
-
-    printf("Protocolo version: %c\n", protocol);
-    printf("Comando: ");
-    switch (command) {
-    case 0x01:
-        printf("CONNECT");
-        break;
-    case 0x02:
-        printf("BIND");
-        break;
-    case 0x03:
-        printf("UDP_ASSOCIATE");
-        break;
-    }
-    printf("\nFamilia: ");
-    switch (atyp) {
-    case 0x01:
-        printf("IP_V4");
-        break;
-    case 0x03:
-        printf("DOMAIN_NAME");
-        break;
-    case 0x04:
-        printf("IP_V6");
-        break;
-    }
-    printf("\n");
+    uint8_t protocol = buffer[i++];
+    uint8_t command = buffer[i++];
+    uint8_t rsv = buffer[i++];
+    uint8_t atyp = buffer[i++];
 
     if (command != 0x01) { // CONNECT
         zk_logger(ZK_LOG_ERROR, "Command not supported. (%02x)\n", command);
-        unsigned char msg[10] = { 0x05, 0x07, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00 };
+        uint8_t msg[10] = { 0x05, 0x07, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00 };
         zk_server_write(socket_fd, msg, sizeof(msg));
         goto close_routine;
     }
 
     if (atyp != 0x01) { // IP_V4
         zk_logger(ZK_LOG_ERROR, "Address type not supported. (%02x)\n", atyp);
-        unsigned char msg[10] = { 0x05, 0x08, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
+        uint8_t msg[10] = { 0x05, 0x08, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
         zk_server_write(socket_fd, msg, sizeof(msg));
         goto close_routine;
     }
 
-    // struct  sockaddr_in dst_addr;
-    // memset(&dst_addr, 0, sizeof(dst_addr));
-    // dst_addr.sin_family = AF_INET;
-    // dst_addr.sin_port = htons(port);
-    // // dst_addr.sin_addr =
+    uint32_t dst_addr_ipv4 = 0;
 
-    // unsigned long dst_addr_l = 0;
-    // memcpy(dst_addr_l, (unsigned long*)&buffer[i], 4);
-    i += 4;
-    // for (int c = 0; c < 4; ++c) {
-    //     i++;
-    //     dst_addr_l |= ((unsigned long)buffer[i] << (4 * c));
-    // }
-    // unsigned int dst_port = (unsigned char)buffer[i++] << CHAR_BIT | (unsigned char)buffer[i++];
-    unsigned int dst_port = 0;
-    memcpy(dst_port, (unsigned int*)&buffer[i], 2);
-    i += 2;
+    for (int x = 0; x < 4; x++) {
+        dst_addr_ipv4 = (dst_addr_ipv4 << CHAR_BIT) | buffer[i++];
+    }
 
-    // struct in_addr dst_addr;
-    // dst_addr.s_addr = dst_addr_l;
-    // printf("DST_ADDR: %s\n", inet_ntoa(dst_addr));
-    printf("DST_PORT: %d\n", dst_port);
+    uint16_t dst_port = (buffer[i++] << CHAR_BIT) | buffer[i++];
+    struct in_addr dst_addr;
+    dst_addr.s_addr = htonl(dst_addr_ipv4);
+
+    zk_logger(ZK_LOG_INFO, "CONNECT %s:%d\n", inet_ntoa(dst_addr), dst_port);
+
+    // Connect to target host
+    int target_sockfd;
+    struct sockaddr_in target_servaddr;
+
+    target_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (target_sockfd == -1) {
+        zk_logger(ZK_LOG_FATAL, "Socket creation failed...\n");
+        uint8_t reply[10] = { 0x05, 0x01, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
+        zk_server_write(socket_fd, reply, sizeof(reply));
+        goto close_routine;
+    }
+
+    bzero(&target_servaddr, sizeof(target_servaddr));
+    target_servaddr.sin_family = AF_INET;
+    target_servaddr.sin_addr = dst_addr;
+    target_servaddr.sin_port = htons(dst_port);
+
+    if (connect(target_sockfd, (struct sockaddr*)&target_servaddr, sizeof(target_servaddr)) != 0) {
+        zk_logger(ZK_LOG_FATAL, "Connection with the server failed....\n");
+        uint8_t reply[10] = { 0x05, 0x05, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
+        zk_server_write(socket_fd, reply, sizeof(reply));
+        goto close_routine;
+    }
+
+    // Connection OK
+    zk_logger(ZK_LOG_INFO, "%s:%d Connection succesfull!\n", inet_ntoa(dst_addr), dst_port);
+    uint8_t reply[10] = { 0x05, 0x00, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
+    zk_server_write(socket_fd, reply, sizeof(reply));
+
+    // Read data from client
+    int read = zk_server_read(socket_fd, buffer, BUFSIZE);
+
+    // Write data to target host
+    int sent = zk_server_write(target_sockfd, buffer, read);
+
+    // Read response from target host
+    read = zk_server_read(target_sockfd, buffer, BUFSIZE);
+
+    // Send response to client
+    sent = zk_server_write(socket_fd, buffer, read);
 
 close_routine:
     sleep(1);
@@ -164,7 +167,7 @@ close_routine:
     exit(EXIT_SUCCESS);
 }
 
-int zk_server_read(int fd, unsigned char buf[], size_t nbyte)
+int zk_server_read(int fd, uint8_t buf[], size_t nbyte)
 {
     int ret = read(fd, buf, nbyte);
     printf("%d bytes recibidos: ", ret);
@@ -176,7 +179,7 @@ int zk_server_read(int fd, unsigned char buf[], size_t nbyte)
     return ret;
 }
 
-int zk_server_write(int fd, unsigned char buf[], size_t nbyte)
+int zk_server_write(int fd, uint8_t buf[], size_t nbyte)
 {
     int ret = write(fd, buf, nbyte);
     printf("%d bytes enviados: ", ret);
