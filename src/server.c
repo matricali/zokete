@@ -28,6 +28,7 @@
 #include <unistd.h>
 
 #include "logger.h"
+#include "server.h"
 
 #define BUFSIZE 8096
 
@@ -37,7 +38,7 @@ void zk_server_process_request(int socket_fd)
 
     static char buffer[BUFSIZE + 1];
 
-    ret = read(socket_fd, buffer, BUFSIZE);
+    ret = zk_server_read(socket_fd, buffer, BUFSIZE);
 
     if (ret == 0 || ret == -1) {
         (void)close(socket_fd);
@@ -50,12 +51,6 @@ void zk_server_process_request(int socket_fd)
         buffer[ret] = 0;
     } else {
         buffer[0] = 0;
-    }
-
-    // Debug momentaneo
-    printf("Recibiendo %ld bytes...\n", ret);
-    for (int i = 0; i < ret; ++i) {
-        printf("[%d]=%02x\n", i, buffer[i]);
     }
 
     // cursor position
@@ -81,22 +76,42 @@ void zk_server_process_request(int socket_fd)
     if (!valid_method) {
         zk_logger(ZK_LOG_ERROR, "No valid authentication method.\n");
         unsigned char msg[2] = { 0x05, 0xFF };
-        (void)write(socket_fd, msg, sizeof(msg));
+        zk_server_write(socket_fd, msg, sizeof(msg));
         goto close_routine;
     }
 
     // METHOD selection message
     unsigned char msg[2] = { 0x05, 0x00 };
-    ret = write(socket_fd, msg, sizeof(msg));
-    printf("%ld bytes enviados:\n", ret);
-    for (int p = 0; p < ret; ++p) {
-        printf("[%d]=%02x\n", i, msg[p]);
-    }
+    zk_server_write(socket_fd, msg, sizeof(msg));
 
 close_routine:
     sleep(1);
     close(socket_fd);
     exit(EXIT_SUCCESS);
+}
+
+int zk_server_read(int fd, unsigned char buf[], size_t nbyte)
+{
+    int ret = read(fd, buf, nbyte);
+    printf("%d bytes recibidos: ", ret);
+
+    for (int i = 0; i < ret; ++i) {
+        printf("%02x ", buf[i]);
+    }
+    printf("\n");
+    return ret;
+}
+
+int zk_server_write(int fd, unsigned char buf[], size_t nbyte)
+{
+    int ret = write(fd, buf, nbyte);
+    printf("%d bytes enviados: ", ret);
+
+    for (int i = 0; i < ret; ++i) {
+        printf("%02x ", buf[i]);
+    }
+    printf("\n");
+    return ret;
 }
 
 int zk_server_start(const unsigned int port)
