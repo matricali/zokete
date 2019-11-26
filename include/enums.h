@@ -19,6 +19,12 @@
 #define ZK_ENUMS_H
 
 typedef enum {
+    ZK_SOCKS_ATYP_IP_V4 = 0x01,
+    ZK_SOCKS_ATYP_DOMAIN_NAME = 0x03,
+    ZK_SOCKS_ATYP_IP_V6 = 0x04
+} zk_socks_atyp_e;
+
+typedef enum {
     ZK_SOCKS_REP_SUCCEEDED = 0x00,
     ZK_SOCKS_REP_SERVER_FAILURE = 0x01,
     ZK_SOCKS_REP_NOT_ALLOWED_BY_RULESET = 0x02,

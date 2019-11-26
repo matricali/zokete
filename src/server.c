@@ -29,15 +29,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "enums.h"
 #include "logger.h"
 #include "server.h"
-#include "enums.h"
 
 #define BUFSIZE 8096
 
-void zk_socks_write_reply(int fd, zk_socks_rep_e rep, uint8_t atyp)
+void zk_socks_write_reply(int fd, zk_socks_rep_e rep, zk_socks_atyp_e atyp)
 {
-    uint8_t reply[10] = { 0x05, rep, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
+    char reply[10] = { 0x05, rep, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
     zk_server_write(fd, reply, sizeof(reply));
 }
 
@@ -45,7 +45,7 @@ void zk_server_process_request(int socket_fd)
 {
     long ret;
 
-    static uint8_t buffer[BUFSIZE + 1];
+    static char buffer[BUFSIZE + 1];
 
     ret = zk_server_read(socket_fd, buffer, BUFSIZE);
 
@@ -67,7 +67,7 @@ void zk_server_process_request(int socket_fd)
 
     // version identifier
     if (buffer[i] != 0x05) {
-        zk_logger(ZK_LOG_INFO, "Unsuported version (%02x)\n", buffer[i]);
+        zk_logger(ZK_LOG_INFO, "Unsuported protocol version (%02x)\n", buffer[i]);
         goto close_routine;
     }
 
@@ -84,13 +84,13 @@ void zk_server_process_request(int socket_fd)
 
     if (!valid_method) {
         zk_logger(ZK_LOG_ERROR, "No valid authentication method.\n");
-        uint8_t msg[2] = { 0x05, 0xFF };
+        char msg[2] = { 0x05, 0xFF };
         zk_server_write(socket_fd, msg, sizeof(msg));
         goto close_routine;
     }
 
     // METHOD selection message
-    uint8_t msg[2] = { 0x05, 0x00 };
+    char msg[2] = { 0x05, 0x00 };
     zk_server_write(socket_fd, msg, sizeof(msg));
 
     // 4. Request
@@ -101,6 +101,16 @@ void zk_server_process_request(int socket_fd)
     uint8_t command = buffer[i++];
     uint8_t rsv = buffer[i++];
     uint8_t atyp = buffer[i++];
+
+    if (protocol != 0x05) {
+        zk_logger(ZK_LOG_INFO, "Unsuported protocol version (%02x)\n", buffer[i]);
+        goto close_routine;
+    }
+
+    if (rsv != 0x00) {
+        zk_logger(ZK_LOG_ERROR, "RSV must be 0x00. (%02x)\n", rsv);
+        goto close_routine;
+    }
 
     if (command != 0x01) { // CONNECT
         zk_logger(ZK_LOG_ERROR, "Command not supported. (%02x)\n", command);
@@ -115,12 +125,13 @@ void zk_server_process_request(int socket_fd)
     }
 
     uint32_t dst_addr_ipv4 = 0;
+    memcpy(&dst_addr_ipv4, ((char *) buffer) + i, 4);
+    dst_addr_ipv4 = ntohl(dst_addr_ipv4);
 
-    for (int x = 0; x < 4; x++) {
-        dst_addr_ipv4 = (dst_addr_ipv4 << CHAR_BIT) | buffer[i++];
-    }
+    uint16_t dst_port = 0;
+    memcpy(&dst_port, ((char *) buffer) + (i + 4), 2);
+    dst_port = ntohs(dst_port);
 
-    uint16_t dst_port = (buffer[i++] << CHAR_BIT) | buffer[i++];
     struct in_addr dst_addr;
     dst_addr.s_addr = htonl(dst_addr_ipv4);
 
@@ -160,7 +171,7 @@ close_routine:
     exit(EXIT_SUCCESS);
 }
 
-int zk_server_read(int fd, uint8_t buf[], size_t nbyte)
+int zk_server_read(int fd, char buf[], size_t nbyte)
 {
     int ret = read(fd, buf, nbyte);
     printf("%d bytes recibidos: ", ret);
@@ -172,7 +183,7 @@ int zk_server_read(int fd, uint8_t buf[], size_t nbyte)
     return ret;
 }
 
-int zk_server_write(int fd, uint8_t buf[], size_t nbyte)
+int zk_server_write(int fd, char buf[], size_t nbyte)
 {
     int ret = write(fd, buf, nbyte);
     printf("%d bytes enviados: ", ret);

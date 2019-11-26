@@ -19,8 +19,8 @@
 #define ZK_SERVER_H
 
 void zk_server_process_request(int socket_fd);
-int zk_server_read(int fd, unsigned char buf[], size_t nbyte);
-int zk_server_write(int fd, unsigned char buf[], size_t nbyte);
+int zk_server_read(int fd, char buf[], size_t nbyte);
+int zk_server_write(int fd, char buf[], size_t nbyte);
 void zk_server_socket_pipe(int fd0, int fd1);
 int zk_server_start(const unsigned int port);
 
