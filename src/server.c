@@ -18,6 +18,7 @@
  */
 
 #include <arpa/inet.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -36,7 +37,7 @@ void zk_server_process_request(int socket_fd)
 {
     long ret;
 
-    static char buffer[BUFSIZE + 1];
+    static unsigned char buffer[BUFSIZE + 1];
 
     ret = zk_server_read(socket_fd, buffer, BUFSIZE);
 
@@ -83,6 +84,79 @@ void zk_server_process_request(int socket_fd)
     // METHOD selection message
     unsigned char msg[2] = { 0x05, 0x00 };
     zk_server_write(socket_fd, msg, sizeof(msg));
+
+    // 4. Request
+    ret = zk_server_read(socket_fd, buffer, BUFSIZE);
+    i = 0;
+
+    char protocol = buffer[i++];
+    char command = buffer[i++];
+    char rsv = buffer[i++];
+    char atyp = buffer[i++];
+
+    printf("Protocolo version: %c\n", protocol);
+    printf("Comando: ");
+    switch (command) {
+    case 0x01:
+        printf("CONNECT");
+        break;
+    case 0x02:
+        printf("BIND");
+        break;
+    case 0x03:
+        printf("UDP_ASSOCIATE");
+        break;
+    }
+    printf("\nFamilia: ");
+    switch (atyp) {
+    case 0x01:
+        printf("IP_V4");
+        break;
+    case 0x03:
+        printf("DOMAIN_NAME");
+        break;
+    case 0x04:
+        printf("IP_V6");
+        break;
+    }
+    printf("\n");
+
+    if (command != 0x01) { // CONNECT
+        zk_logger(ZK_LOG_ERROR, "Command not supported. (%02x)\n", command);
+        unsigned char msg[10] = { 0x05, 0x07, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00 };
+        zk_server_write(socket_fd, msg, sizeof(msg));
+        goto close_routine;
+    }
+
+    if (atyp != 0x01) { // IP_V4
+        zk_logger(ZK_LOG_ERROR, "Address type not supported. (%02x)\n", atyp);
+        unsigned char msg[10] = { 0x05, 0x08, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
+        zk_server_write(socket_fd, msg, sizeof(msg));
+        goto close_routine;
+    }
+
+    // struct  sockaddr_in dst_addr;
+    // memset(&dst_addr, 0, sizeof(dst_addr));
+    // dst_addr.sin_family = AF_INET;
+    // dst_addr.sin_port = htons(port);
+    // // dst_addr.sin_addr =
+
+    // unsigned long dst_addr_l = 0;
+    // memcpy(dst_addr_l, (unsigned long*)&buffer[i], 4);
+    i += 4;
+    // for (int c = 0; c < 4; ++c) {
+    //     i++;
+    //     dst_addr_l |= ((unsigned long)buffer[i] << (4 * c));
+    // }
+    // unsigned int dst_port = (unsigned char)buffer[i++] << CHAR_BIT | (unsigned char)buffer[i++];
+    unsigned int dst_port = 0;
+    memcpy(dst_port, (unsigned int*)&buffer[i], 2);
+    i += 2;
+
+    // struct in_addr dst_addr;
+    // dst_addr.s_addr = dst_addr_l;
+    // printf("DST_ADDR: %s\n", inet_ntoa(dst_addr));
+    printf("DST_PORT: %d\n", dst_port);
 
 close_routine:
     sleep(1);

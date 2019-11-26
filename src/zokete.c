@@ -25,7 +25,7 @@
 
 void zk_print_banner()
 {
-    printf("zoketed v0.1 - Simple SOCKS5 Serverf (https://github.com/matricali/zokete)\n");
+    printf("zoketed v0.1 - A simple SOCKS5 Server (https://github.com/matricali/zokete)\n");
 }
 
 void zk_usage(const char* p)
