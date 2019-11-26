@@ -31,9 +31,15 @@
 
 #include "logger.h"
 #include "server.h"
-#include "socks/replies.h"
+#include "enums.h"
 
 #define BUFSIZE 8096
+
+void zk_socks_write_reply(int fd, zk_socks_rep_e rep, uint8_t atyp)
+{
+    uint8_t reply[10] = { 0x05, rep, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
+    zk_server_write(fd, reply, sizeof(reply));
+}
 
 void zk_server_process_request(int socket_fd)
 {
@@ -98,17 +104,13 @@ void zk_server_process_request(int socket_fd)
 
     if (command != 0x01) { // CONNECT
         zk_logger(ZK_LOG_ERROR, "Command not supported. (%02x)\n", command);
-        uint8_t msg[10] = { 0x05, ZK_SOCKS_REP_COMMAND_NOT_SUPPORTED,
-            0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00 };
-        zk_server_write(socket_fd, msg, sizeof(msg));
+        zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_COMMAND_NOT_SUPPORTED, atyp);
         goto close_routine;
     }
 
     if (atyp != 0x01) { // IP_V4
         zk_logger(ZK_LOG_ERROR, "Address type not supported. (%02x)\n", atyp);
-        uint8_t msg[10] = { 0x05, ZK_SOCKS_REP_ADDRESS_TYPE_NOT_SUPPORTED,
-            0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
-        zk_server_write(socket_fd, msg, sizeof(msg));
+        zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_ADDRESS_TYPE_NOT_SUPPORTED, atyp);
         goto close_routine;
     }
 
@@ -131,8 +133,7 @@ void zk_server_process_request(int socket_fd)
     target_sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (target_sockfd == -1) {
         zk_logger(ZK_LOG_FATAL, "Socket creation failed...\n");
-        uint8_t reply[10] = { 0x05, ZK_SOCKS_REP_SERVER_FAILURE, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
-        zk_server_write(socket_fd, reply, sizeof(reply));
+        zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_SERVER_FAILURE, atyp);
         goto close_routine;
     }
 
@@ -143,15 +144,13 @@ void zk_server_process_request(int socket_fd)
 
     if (connect(target_sockfd, (struct sockaddr*)&target_servaddr, sizeof(target_servaddr)) != 0) {
         zk_logger(ZK_LOG_FATAL, "Connection with the server failed....\n");
-        uint8_t reply[10] = { 0x05, ZK_SOCKS_REP_CONNECTION_REFUSED, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
-        zk_server_write(socket_fd, reply, sizeof(reply));
+        zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_CONNECTION_REFUSED, atyp);
         goto close_routine;
     }
 
     // Connection OK
     zk_logger(ZK_LOG_INFO, "%s:%d Connection succesfull!\n", inet_ntoa(dst_addr), dst_port);
-    uint8_t reply[10] = { 0x05, ZK_SOCKS_REP_SUCCEEDED, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
-    zk_server_write(socket_fd, reply, sizeof(reply));
+    zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_SUCCEEDED, atyp);
 
     zk_server_socket_pipe(socket_fd, target_sockfd);
 
