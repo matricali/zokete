@@ -18,6 +18,7 @@
  */
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <limits.h>
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -68,7 +69,7 @@ void zk_server_process_request(int socket_fd)
 
     // looking for implemented authentication method
     bool valid_method = false;
-    while (--nmethods > 0) {
+    while (--nmethods >= 0) {
         if (buffer[++i] == 0x00) {
             valid_method = true;
         }
@@ -149,17 +150,7 @@ void zk_server_process_request(int socket_fd)
     uint8_t reply[10] = { 0x05, 0x00, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
     zk_server_write(socket_fd, reply, sizeof(reply));
 
-    // Read data from client
-    int read = zk_server_read(socket_fd, buffer, BUFSIZE);
-
-    // Write data to target host
-    int sent = zk_server_write(target_sockfd, buffer, read);
-
-    // Read response from target host
-    read = zk_server_read(target_sockfd, buffer, BUFSIZE);
-
-    // Send response to client
-    sent = zk_server_write(socket_fd, buffer, read);
+    zk_server_socket_pipe(socket_fd, target_sockfd);
 
 close_routine:
     sleep(1);
@@ -189,6 +180,44 @@ int zk_server_write(int fd, uint8_t buf[], size_t nbyte)
     }
     printf("\n");
     return ret;
+}
+
+void zk_server_socket_pipe(int fd0, int fd1)
+{
+    int maxfd, ret;
+    fd_set rd_set;
+    size_t nread;
+    char buffer_r[BUFSIZE];
+
+    zk_logger(ZK_LOG_INFO, "Connecting two sockets\n");
+
+    maxfd = (fd0 > fd1) ? fd0 : fd1;
+    for (;;) {
+        FD_ZERO(&rd_set);
+        FD_SET(fd0, &rd_set);
+        FD_SET(fd1, &rd_set);
+        ret = select(maxfd + 1, &rd_set, NULL, NULL, NULL);
+
+        if (ret < 0 && errno == EINTR) {
+            continue;
+        }
+
+        if (FD_ISSET(fd0, &rd_set)) {
+            nread = zk_server_read(fd0, buffer_r, BUFSIZE);
+            if (nread <= 0) {
+                break;
+            }
+            zk_server_write(fd1, buffer_r, nread);
+        }
+
+        if (FD_ISSET(fd1, &rd_set)) {
+            nread = zk_server_read(fd1, buffer_r, BUFSIZE);
+            if (nread <= 0) {
+                break;
+            }
+            zk_server_write(fd0, buffer_r, nread);
+        }
+    }
 }
 
 int zk_server_start(const unsigned int port)
