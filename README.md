@@ -3,7 +3,7 @@
 # zokete
 Simple SOCKS5 Server. Written in _C_.
 
-## Requeriments
+## Requirements
 * `gcc` compiler
 
 ## Build
