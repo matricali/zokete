@@ -35,22 +35,22 @@
 
 #define BUFSIZE 8096
 
-void zk_socks_write_reply(int fd, zk_socks_rep_e rep, zk_socks_atyp_e atyp)
+void zk_socks_write_reply(zk_server_connection_t conn, zk_socks_rep_e rep, zk_socks_atyp_e atyp)
 {
     char reply[10] = { 0x05, rep, 0x00, atyp, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0 };
-    zk_server_write(fd, reply, sizeof(reply));
+    zk_server_write(conn, reply, sizeof(reply));
 }
 
-void zk_server_process_request(int socket_fd)
+void zk_server_process_request(zk_server_connection_t cli_conn)
 {
     long ret;
 
     static char buffer[BUFSIZE + 1];
 
-    ret = zk_server_read(socket_fd, buffer, BUFSIZE);
 
+    ret = zk_server_read(cli_conn, buffer, BUFSIZE);
     if (ret == 0 || ret == -1) {
-        (void)close(socket_fd);
+        (void)close(cli_conn.sockfd);
         zk_logger(ZK_LOG_ERROR, "Failed to read from client.\n");
         goto close_routine;
     }
@@ -85,16 +85,16 @@ void zk_server_process_request(int socket_fd)
     if (!valid_method) {
         zk_logger(ZK_LOG_ERROR, "No valid authentication method.\n");
         char msg[2] = { 0x05, ZK_SOCKS_METHOD_NO_ACCEPTABLE_METHODS };
-        zk_server_write(socket_fd, msg, sizeof(msg));
+        zk_server_write(cli_conn, msg, sizeof(msg));
         goto close_routine;
     }
 
     // METHOD selection message
     char msg[2] = { 0x05, ZK_SOCKS_METHOD_NO_AUTH };
-    zk_server_write(socket_fd, msg, sizeof(msg));
+    zk_server_write(cli_conn, msg, sizeof(msg));
 
     // 4. Request
-    ret = zk_server_read(socket_fd, buffer, BUFSIZE);
+    ret = zk_server_read(cli_conn, buffer, BUFSIZE);
     i = 0;
 
     uint8_t protocol = buffer[i++];
@@ -114,22 +114,22 @@ void zk_server_process_request(int socket_fd)
 
     if (command != ZK_SOCKS_CMD_CONNECT) {
         zk_logger(ZK_LOG_ERROR, "Command not supported. (%02x)\n", command);
-        zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_COMMAND_NOT_SUPPORTED, atyp);
+        zk_socks_write_reply(cli_conn, ZK_SOCKS_REP_COMMAND_NOT_SUPPORTED, atyp);
         goto close_routine;
     }
 
     if (atyp != ZK_SOCKS_ATYP_IP_V4) {
         zk_logger(ZK_LOG_ERROR, "Address type not supported. (%02x)\n", atyp);
-        zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_ADDRESS_TYPE_NOT_SUPPORTED, atyp);
+        zk_socks_write_reply(cli_conn, ZK_SOCKS_REP_ADDRESS_TYPE_NOT_SUPPORTED, atyp);
         goto close_routine;
     }
 
     uint32_t dst_addr_ipv4 = 0;
-    memcpy(&dst_addr_ipv4, ((char *) buffer) + i, 4);
+    memcpy(&dst_addr_ipv4, ((char*)buffer) + 4, 4);
     dst_addr_ipv4 = ntohl(dst_addr_ipv4);
 
     uint16_t dst_port = 0;
-    memcpy(&dst_port, ((char *) buffer) + (i + 4), 2);
+    memcpy(&dst_port, ((char*)buffer) + (i + 8), 2);
     dst_port = ntohs(dst_port);
 
     struct in_addr dst_addr;
@@ -138,64 +138,52 @@ void zk_server_process_request(int socket_fd)
     zk_logger(ZK_LOG_INFO, "CONNECT %s:%d\n", inet_ntoa(dst_addr), dst_port);
 
     // Connect to target host
-    int target_sockfd;
-    struct sockaddr_in target_servaddr;
+    zk_server_connection_t target_conn = {};
 
-    target_sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (target_sockfd == -1) {
+    target_conn.sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (target_conn.sockfd == -1) {
         zk_logger(ZK_LOG_FATAL, "Socket creation failed...\n");
-        zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_SERVER_FAILURE, atyp);
+        zk_socks_write_reply(cli_conn, ZK_SOCKS_REP_SERVER_FAILURE, atyp);
         goto close_routine;
     }
 
-    bzero(&target_servaddr, sizeof(target_servaddr));
-    target_servaddr.sin_family = AF_INET;
-    target_servaddr.sin_addr = dst_addr;
-    target_servaddr.sin_port = htons(dst_port);
+    target_conn.servaddr.sin_family = AF_INET;
+    target_conn.servaddr.sin_addr = dst_addr;
+    target_conn.servaddr.sin_port = htons(dst_port);
 
-    if (connect(target_sockfd, (struct sockaddr*)&target_servaddr, sizeof(target_servaddr)) != 0) {
+    if (connect(target_conn.sockfd, (struct sockaddr*)&target_conn.servaddr, sizeof(target_conn.servaddr)) != 0) {
         zk_logger(ZK_LOG_FATAL, "Connection with the server failed....\n");
-        zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_CONNECTION_REFUSED, atyp);
+        zk_socks_write_reply(cli_conn, ZK_SOCKS_REP_CONNECTION_REFUSED, atyp);
         goto close_routine;
     }
 
     // Connection OK
     zk_logger(ZK_LOG_INFO, "%s:%d Connection succesfull!\n", inet_ntoa(dst_addr), dst_port);
-    zk_socks_write_reply(socket_fd, ZK_SOCKS_REP_SUCCEEDED, atyp);
+    zk_socks_write_reply(cli_conn, ZK_SOCKS_REP_SUCCEEDED, atyp);
+    zk_server_socket_pipe(cli_conn, target_conn);
 
-    zk_server_socket_pipe(socket_fd, target_sockfd);
+    // Close connection to target
+    close(target_conn.sockfd);
 
 close_routine:
     sleep(1);
-    close(socket_fd);
+    close(cli_conn.sockfd);
     exit(EXIT_SUCCESS);
 }
 
-int zk_server_read(int fd, char buf[], size_t nbyte)
+int zk_server_read(zk_server_connection_t conn, char buf[], size_t nbyte)
 {
-    int ret = read(fd, buf, nbyte);
-    printf("%d bytes recibidos: ", ret);
-
-    for (int i = 0; i < ret; ++i) {
-        printf("%02x ", buf[i]);
-    }
-    printf("\n");
+    int ret = read(conn.sockfd, buf, nbyte);
     return ret;
 }
 
-int zk_server_write(int fd, char buf[], size_t nbyte)
+int zk_server_write(zk_server_connection_t conn, char buf[], size_t nbyte)
 {
-    int ret = write(fd, buf, nbyte);
-    printf("%d bytes enviados: ", ret);
-
-    for (int i = 0; i < ret; ++i) {
-        printf("%02x ", buf[i]);
-    }
-    printf("\n");
+    int ret = write(conn.sockfd, buf, nbyte);
     return ret;
 }
 
-void zk_server_socket_pipe(int fd0, int fd1)
+void zk_server_socket_pipe(zk_server_connection_t conn0, zk_server_connection_t conn1)
 {
     int maxfd, ret;
     fd_set rd_set;
@@ -204,31 +192,39 @@ void zk_server_socket_pipe(int fd0, int fd1)
 
     zk_logger(ZK_LOG_INFO, "Connecting two sockets\n");
 
-    maxfd = (fd0 > fd1) ? fd0 : fd1;
+    maxfd = (conn0.sockfd > conn1.sockfd) ? conn0.sockfd : conn1.sockfd;
+
+    char addr0[INET_ADDRSTRLEN] = {};
+    char addr1[INET_ADDRSTRLEN] = {};
+    inet_ntop(AF_INET, &conn0.servaddr.sin_addr, addr0, sizeof(addr0));
+    inet_ntop(AF_INET, &conn1.servaddr.sin_addr, addr1, sizeof(addr1));
+
     for (;;) {
         FD_ZERO(&rd_set);
-        FD_SET(fd0, &rd_set);
-        FD_SET(fd1, &rd_set);
+        FD_SET(conn0.sockfd, &rd_set);
+        FD_SET(conn1.sockfd, &rd_set);
         ret = select(maxfd + 1, &rd_set, NULL, NULL, NULL);
 
         if (ret < 0 && errno == EINTR) {
             continue;
         }
 
-        if (FD_ISSET(fd0, &rd_set)) {
-            nread = zk_server_read(fd0, buffer_r, BUFSIZE);
+        if (FD_ISSET(conn0.sockfd, &rd_set)) {
+            nread = zk_server_read(conn0, buffer_r, BUFSIZE);
             if (nread <= 0) {
                 break;
             }
-            zk_server_write(fd1, buffer_r, nread);
+            zk_server_write(conn1, buffer_r, nread);
+            zk_logger(ZK_LOG_INFO, "%s >> %s - %d bytes.\n", addr0, addr1, nread);
         }
 
-        if (FD_ISSET(fd1, &rd_set)) {
-            nread = zk_server_read(fd1, buffer_r, BUFSIZE);
+        if (FD_ISSET(conn1.sockfd, &rd_set)) {
+            nread = zk_server_read(conn1, buffer_r, BUFSIZE);
             if (nread <= 0) {
                 break;
             }
-            zk_server_write(fd0, buffer_r, nread);
+            zk_server_write(conn0, buffer_r, nread);
+            zk_logger(ZK_LOG_INFO, "%s << %s - %d bytes.\n", addr0, addr1, nread);
         }
     }
 }
@@ -236,13 +232,10 @@ void zk_server_socket_pipe(int fd0, int fd1)
 int zk_server_start(const unsigned int port)
 {
     int listenfd = 0;
-    int socketfd = 0;
     int iEnabled = 1;
     pid_t pid = 0;
 
     static struct sockaddr_in serv_addr;
-    static struct sockaddr_in cli_addr;
-    socklen_t len = 0;
 
     zk_logger(ZK_LOG_INFO, "Starting zoketed on port %d...\n", port);
 
@@ -270,20 +263,18 @@ int zk_server_start(const unsigned int port)
     }
 
     for (;;) {
-        len = sizeof(cli_addr);
+        zk_server_connection_t cli_conn = {};
+        socklen_t len = sizeof(cli_conn.servaddr);
 
-        socketfd = accept(listenfd, (struct sockaddr*)&cli_addr, &len);
+        cli_conn.sockfd = accept(listenfd, (struct sockaddr*)&cli_conn.servaddr, &len);
 
-        char client_address[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &(cli_addr.sin_addr), client_address, INET_ADDRSTRLEN);
-
-        if (socketfd < 0) {
-            zk_logger(ZK_LOG_FATAL, "Cannot accept incoming connection from %s\n", client_address);
-            (void)close(socketfd);
+        if (cli_conn.sockfd < 0) {
+            zk_logger(ZK_LOG_FATAL, "Cannot accept incoming connection from %s.\n", inet_ntoa(cli_conn.servaddr.sin_addr));
+            (void)close(cli_conn.sockfd);
             return EXIT_FAILURE;
         }
 
-        zk_logger(ZK_LOG_INFO, "Incoming connection from %s\n", client_address);
+        zk_logger(ZK_LOG_INFO, "Incoming connection from %s.\n", inet_ntoa(cli_conn.servaddr.sin_addr));
 
         pid = fork();
         if (pid < 0) {
@@ -293,9 +284,9 @@ int zk_server_start(const unsigned int port)
 
         if (pid == 0) {
             (void)close(listenfd);
-            zk_server_process_request(socketfd);
+            zk_server_process_request(cli_conn);
         } else {
-            (void)close(socketfd);
+            (void)close(cli_conn.sockfd);
         }
     }
 }
