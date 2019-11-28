@@ -1,7 +1,7 @@
 CC	= gcc
 
-CFLAGS	+= -Wall -g -std=gnu99 -O3 -Iinclude
-LDFLAGS	+= -lpthread -lssh
+CFLAGS	+= -Wall -std=gnu99 -O3 -Iinclude
+LDFLAGS	+=
 
 NAME	= zoketed
 SRCS	:= zokete.c logger.c server.c
