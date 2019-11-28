@@ -47,7 +47,6 @@ void zk_server_process_request(zk_server_connection_t cli_conn)
 
     static char buffer[BUFSIZE + 1];
 
-
     ret = zk_server_read(cli_conn, buffer, BUFSIZE);
     if (ret == 0 || ret == -1) {
         (void)close(cli_conn.sockfd);
@@ -96,6 +95,11 @@ void zk_server_process_request(zk_server_connection_t cli_conn)
     // 4. Request
     ret = zk_server_read(cli_conn, buffer, BUFSIZE);
     i = 0;
+
+    if (ret < 4) {
+        goto close_routine;
+        zk_logger(ZK_LOG_INFO, "Unsuported protocol.\n");
+    }
 
     uint8_t protocol = buffer[0];
     uint8_t command = buffer[1];
