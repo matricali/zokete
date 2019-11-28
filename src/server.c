@@ -97,10 +97,10 @@ void zk_server_process_request(zk_server_connection_t cli_conn)
     ret = zk_server_read(cli_conn, buffer, BUFSIZE);
     i = 0;
 
-    uint8_t protocol = buffer[i++];
-    uint8_t command = buffer[i++];
-    uint8_t rsv = buffer[i++];
-    uint8_t atyp = buffer[i++];
+    uint8_t protocol = buffer[0];
+    uint8_t command = buffer[1];
+    uint8_t rsv = buffer[2];
+    uint8_t atyp = buffer[3];
 
     if (protocol != 0x05) {
         zk_logger(ZK_LOG_INFO, "Unsuported protocol version (%02x)\n", protocol);
