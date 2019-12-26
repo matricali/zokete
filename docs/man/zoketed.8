@@ -1,20 +1,24 @@
 .Dd December 25, 2019
-.Dt ZOKETED 1    \" Program name and manual section number
+.Dt ZOKETED 8
 .Os
 .Sh NAME            \" Section Header - required - don't modify
 .Nm zoketed
-.Nd Simple SOCKS5 server
+.Nd Zokete SOCKS5 server
 https://github.com/matricali/zokete
 .Sh SYNOPSIS                \" Section Header - required - don't modify
 .Nm
 .Op Fl hv                   \" [-hv]
-.Op Fl Fl help              \" [--help]
-.Op Fl Fl version           \" [--version]
+.Op Fl -help              \" [--help]
+.Op Fl -version           \" [--version]
 .Op Fl p Ar port            \" [-p port]
-.Op Fl Fl port Ar port      \" [-p port]
+.Op Fl -port Ar port      \" [-p port]
 .Sh DESCRIPTION          \" Section Header - required - don't modify
-.Bl -tag -width "                 "  \" Begins a tagged list
-.It Fl h, Fl Fl help                 \"-a flag as a list item
+.Nm
+is a simple SOCKS5 server.
+.Sh OPTIONS
+The following options are available:
+.Bl -tag -width XXrXXXrecursiveX
+.It Fl h , -help
 Shows help screen
 .It Fl v, Fl Fl version
 Version
@@ -25,7 +29,8 @@ Listening port
 .\" .Sh HISTORY           \" Document history if command behaves in a unique manner
 .Sh AUTHOR
 .Nm
-was written by Jorge Matricali <jorgematricali@gmail.com>.
+was written by
+.An Jorge Matricali Aq Mt jorgematricali@gmail.com
 .Pp
 Permission is granted to copy, distribute and/or modify this
 document under the terms of the GNU Free
