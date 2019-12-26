@@ -12,4 +12,3 @@ Package: zokete
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Simple SOCKS5 server
- <insert long description, indented with spaces>

@@ -15,28 +15,23 @@ $(OBJS): obj/%.o : src/%.c
 	@$(CC) $(USER_DEFINES) $(CFLAGS) -c $< -o $@
 	@echo "Compiled "$<" successfully!"
 
-.PHONY: all
 all: dirs $(NAME)
 
-.PHONY: dirs
 dirs:
 	mkdir -p obj
 
-.PHONY: clean
 clean:
 	rm -f $(OBJS)
 
-.PHONY: fclean
 fclean: clean
 	rm -f $(NAME)
 
-.PHONY: re
 re: fclean all
 
 .PHONY: install
 install: $(NAME)
-	mkdir -p $(DESTDIR)$(PREFIX)/bin
-	cp $(NAME) $(DESTDIR)$(PREFIX)/bin/$(NAME)
+	mkdir -p $(DESTDIR)$(PREFIX)$(BINDIR)
+	cp $(NAME) $(DESTDIR)$(PREFIX)$(BINDIR)/$(NAME)
 
 .PHONY: uninstall
 uninstall:
