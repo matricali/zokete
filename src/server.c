@@ -17,17 +17,18 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <arpa/inet.h>
 #include <errno.h>
 #include <limits.h>
-#include <netinet/in.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <unistd.h>
 
 #include "enums.h"
 #include "logger.h"
@@ -116,12 +117,14 @@ void zk_server_process_request(zk_server_connection_t cli_conn)
         goto close_routine;
     }
 
+    // We only support CONNECT method for now
     if (command != ZK_SOCKS_CMD_CONNECT) {
         zk_logger(ZK_LOG_ERROR, "Command not supported. (%02x)\n", command);
         zk_socks_write_reply(cli_conn, ZK_SOCKS_REP_COMMAND_NOT_SUPPORTED, atyp);
         goto close_routine;
     }
 
+    // We only support IPV4 targets
     if (atyp != ZK_SOCKS_ATYP_IP_V4) {
         zk_logger(ZK_LOG_ERROR, "Address type not supported. (%02x)\n", atyp);
         zk_socks_write_reply(cli_conn, ZK_SOCKS_REP_ADDRESS_TYPE_NOT_SUPPORTED, atyp);
