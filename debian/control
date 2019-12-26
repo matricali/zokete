@@ -1,0 +1,15 @@
+Source: zokete
+Section: net
+Priority: optional
+Maintainer: Jorge Matricali <jorgematricali@gmail.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/matricali/zokete
+Vcs-Git: git://github.com/matricali/zokete.git
+Vcs-Browser: https://github.com/matricali/zokete
+
+Package: zokete
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Simple SOCKS5 server
+ <insert long description, indented with spaces>

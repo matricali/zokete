@@ -1,37 +1,42 @@
 CC	= gcc
 
-CFLAGS	+= -Wall -std=gnu99 -O3 -Iinclude
+CFLAGS	+= -Wall -g -std=gnu99 -O2 -Iinclude
 LDFLAGS	+=
 
 NAME	= zoketed
 SRCS	:= zokete.c logger.c server.c
 OBJS	:= $(SRCS:%.c=obj/%.o)
 
-all: dirs $(NAME)
-
-dirs:
-	mkdir -p obj
-
 $(NAME): $(OBJS)
 	@$(CC) $(OBJS) $(LDFLAGS) -o $@
 	@echo "Linking complete!"
 
 $(OBJS): obj/%.o : src/%.c
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(USER_DEFINES) $(CFLAGS) -c $< -o $@
 	@echo "Compiled "$<" successfully!"
 
+.PHONY: all
+all: dirs $(NAME)
+
+.PHONY: dirs
+dirs:
+	mkdir -p obj
+
+.PHONY: clean
 clean:
 	rm -f $(OBJS)
 
+.PHONY: fclean
 fclean: clean
 	rm -f $(NAME)
 
+.PHONY: re
 re: fclean all
 
 .PHONY: install
 install: $(NAME)
-	mkdir -p $(DESTDIR)$(PREFIX)/$(BINDIR)
-	cp $(NAME) $(DESTDIR)$(PREFIX)/$(BINDIR)/$(NAME)
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	cp $(NAME) $(DESTDIR)$(PREFIX)/bin/$(NAME)
 
 .PHONY: uninstall
 uninstall:
