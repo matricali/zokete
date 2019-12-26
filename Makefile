@@ -7,6 +7,11 @@ NAME	= zoketed
 SRCS	:= zokete.c logger.c server.c
 OBJS	:= $(SRCS:%.c=obj/%.o)
 
+all: dirs $(NAME)
+
+dirs:
+	mkdir -p obj
+
 $(NAME): $(OBJS)
 	@$(CC) $(OBJS) $(LDFLAGS) -o $@
 	@echo "Linking complete!"
@@ -14,11 +19,6 @@ $(NAME): $(OBJS)
 $(OBJS): obj/%.o : src/%.c
 	@$(CC) $(USER_DEFINES) $(CFLAGS) -c $< -o $@
 	@echo "Compiled "$<" successfully!"
-
-all: dirs $(NAME)
-
-dirs:
-	mkdir -p obj
 
 clean:
 	rm -f $(OBJS)
