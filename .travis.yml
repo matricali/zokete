@@ -39,6 +39,10 @@ env:
   - OS=ubuntu DIST=trusty ARCH=i386
   - OS=ubuntu DIST=precise ARCH=i386
 
+jobs:
+  allow_failures:
+  - env: OS=debian DIST=jessie ARCH=i386
+
 script:
 - git describe --long
 - make
