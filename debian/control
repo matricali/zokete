@@ -9,6 +9,7 @@ Vcs-Git: git://github.com/matricali/zokete.git
 Vcs-Browser: https://github.com/matricali/zokete
 
 Package: zokete
-Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Simple SOCKS5 server
+Architecture: i386 amd64
+Depends: lsb-base, ${shlibs:Depends}, ${misc:Depends}
+Description: SOCKS5 server
+ Zokete is a lightweight and efficient SOCKS5 server.
